@@ -61,7 +61,7 @@ export default function TeachersPreview() {
         "
         >
           {teachers.map((teacher) => (
-            <TeacherCard key={teacher.id} {...teacher} />
+            <TeacherCard key={teacher.id} teacher={teacher} />
           ))}
         </div>
       </div>

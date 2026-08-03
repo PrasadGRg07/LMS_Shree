@@ -66,7 +66,7 @@ export default function GalleryPreview() {
             >
               <img
                 src={item.image}
-                alt={item.text}
+                alt={item.title}
                 className="
               h-80
               w-full
@@ -90,7 +90,7 @@ export default function GalleryPreview() {
                 text-slate-900
                 "
                 >
-                  {item.text}
+                  {item.title}
                 </h3>
               </div>
             </div>

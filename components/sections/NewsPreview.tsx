@@ -68,7 +68,7 @@ lg:grid-cols-3
 "
         >
           {news.map((item, index) => (
-            <NewsCard key={index} {...item} />
+            <NewsCard key={index} item={item} />
           ))}
         </div>
       </div>
