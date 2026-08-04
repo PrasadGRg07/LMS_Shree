@@ -8,45 +8,50 @@ import {
   ListChecks,
   Users,
 } from "lucide-react";
+import { ReactNode } from "react";
 
-export default function CourseLayout({
+interface CourseLayoutProps {
+  children: ReactNode;
+  params: Promise<{
+    courseId: string;
+  }>;
+}
+
+export default async function CourseLayout({
   children,
   params,
-}: {
-  children: React.ReactNode;
-  params: {
-    courseId: string;
-  };
-}) {
+}: CourseLayoutProps) {
+  const { courseId } = await params;
+
   const menuItems = [
     {
       title: "Overview",
-      href: `/dashboard/teacher/courses/${params.courseId}`,
+      href: `/dashboard/teacher/courses/${courseId}`,
       icon: LayoutDashboard,
     },
     {
       title: "Lessons",
-      href: `/dashboard/teacher/courses/${params.courseId}/lessons`,
+      href: `/dashboard/teacher/courses/${courseId}/lessons`,
       icon: BookOpen,
     },
     {
       title: "Assignments",
-      href: `/dashboard/teacher/courses/${params.courseId}/assignments`,
+      href: `/dashboard/teacher/courses/${courseId}/assignments`,
       icon: FileText,
     },
     {
       title: "Quizzes",
-      href: `/dashboard/teacher/courses/${params.courseId}/quizzes`,
+      href: `/dashboard/teacher/courses/${courseId}/quizzes`,
       icon: ListChecks,
     },
     {
       title: "Students",
-      href: `/dashboard/teacher/courses/${params.courseId}/students`,
+      href: `/dashboard/teacher/courses/${courseId}/students`,
       icon: Users,
     },
     {
       title: "Analytics",
-      href: `/dashboard/teacher/courses/${params.courseId}/analytics`,
+      href: `/dashboard/teacher/courses/${courseId}/analytics`,
       icon: BarChart3,
     },
   ];
@@ -72,15 +77,7 @@ export default function CourseLayout({
       </div>
 
       {/* Navigation */}
-      <div
-        className="
-        grid 
-        grid-cols-2 
-        gap-3
-        md:grid-cols-3
-        lg:grid-cols-6
-      "
-      >
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
         {menuItems.map((item) => {
           const Icon = item.icon;
 
@@ -88,38 +85,9 @@ export default function CourseLayout({
             <Link
               key={item.title}
               href={item.href}
-              className="
-              group
-              flex
-              flex-col
-              items-center
-              justify-center
-              gap-2
-              rounded-xl
-              border
-              bg-white
-              p-4
-              text-center
-              transition
-              hover:border-black
-              hover:shadow-md
-              "
+              className="group flex flex-col items-center justify-center gap-2 rounded-xl border bg-white p-4 text-center transition hover:border-black hover:shadow-md"
             >
-              <div
-                className="
-                flex
-                h-10
-                w-10
-                items-center
-                justify-center
-                rounded-lg
-                bg-gray-100
-                text-gray-700
-                transition
-                group-hover:bg-black
-                group-hover:text-white
-                "
-              >
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gray-100 text-gray-700 transition group-hover:bg-black group-hover:text-white">
                 <Icon size={20} />
               </div>
 
