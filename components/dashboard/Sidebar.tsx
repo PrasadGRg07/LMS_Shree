@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { LogOut } from "lucide-react";
 
 import { roleMenu } from "./navigation/roleMenu";
@@ -8,9 +9,14 @@ import { roleMenu } from "./navigation/roleMenu";
 type Role = "student" | "teacher" | "parent" | "admin";
 
 export default function Sidebar() {
-  // temporary role
-  // later this comes from auth context
-  const role: Role = "student";
+  const pathname = usePathname();
+  const role: Role = pathname.includes("/dashboard/teacher")
+    ? "teacher"
+    : pathname.includes("/dashboard/parent")
+      ? "parent"
+      : pathname.includes("/dashboard/admin")
+        ? "admin"
+        : "student";
 
   const menus = roleMenu[role];
 
@@ -39,23 +45,26 @@ export default function Sidebar() {
       <nav className="mt-10 space-y-2">
         {menus.map((item) => {
           const Icon = item.icon;
+          const isActive = pathname === item.href;
 
           return (
             <Link
               key={item.name}
               href={item.href}
-              className="
+              className={`
               flex
               items-center
               gap-4
               rounded-xl
               px-4
               py-3
-              text-slate-700
               transition
-              hover:bg-blue-50
-              hover:text-blue-600
-              "
+              ${
+                isActive
+                  ? "bg-blue-600 text-white"
+                  : "text-slate-700 hover:bg-blue-50 hover:text-blue-600"
+              }
+              `}
             >
               <Icon size={21} />
 

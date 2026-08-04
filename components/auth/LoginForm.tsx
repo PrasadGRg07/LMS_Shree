@@ -19,32 +19,30 @@ const roles = [
 
 export default function LoginForm() {
   const router = useRouter();
-  const { login } = useAuth();
+  const { login, isLoading } = useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<Role>("student");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
   const selectedRole = roles.find((r) => r.value === role);
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setErrorMessage("");
 
     try {
-      setIsLoading(true);
-
-      // Temporary login - replace with API later
-      await Promise.resolve();
-
-      login(email, password, role);
+      await login(email, password, role);
       router.push(`/dashboard/${role}`);
     } catch (error) {
-      console.error("Login failed:", error);
-    } finally {
-      setIsLoading(false);
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Login failed. Please try again.",
+      );
     }
   };
 
@@ -138,6 +136,12 @@ export default function LoginForm() {
             </button>
           </div>
         </div>
+
+        {errorMessage ? (
+          <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
+            {errorMessage}
+          </p>
+        ) : null}
 
         <div className="flex items-center justify-between text-sm">
           <label className="flex items-center gap-2 text-slate-600">

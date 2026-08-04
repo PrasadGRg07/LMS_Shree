@@ -1,4 +1,18 @@
+"use client";
+
+import { usePathname } from "next/navigation";
+
 export default function Header() {
+  const pathname = usePathname();
+
+  const role = pathname.includes("/dashboard/teacher")
+    ? "Teacher"
+    : pathname.includes("/dashboard/parent")
+      ? "Parent"
+      : pathname.includes("/dashboard/admin")
+        ? "Admin"
+        : "Student";
+
   return (
     <header
       className="
@@ -21,9 +35,9 @@ export default function Header() {
         "
       >
         <div className="text-right">
-          <p className="font-semibold">User Name</p>
+          <p className="font-semibold">Mr. Sharma</p>
 
-          <p className="text-sm text-slate-500">Student</p>
+          <p className="text-sm text-slate-500">{role}</p>
         </div>
 
         <div
