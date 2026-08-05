@@ -6,7 +6,7 @@ export const teacherCourses: Course[] = [
   {
     id: "course-1",
 
-    title: "Grade 8 Mathematics",
+    title: "Grade 10 Mathematics",
 
     description:
       "Complete mathematics course covering algebra, geometry, and problem solving.",
