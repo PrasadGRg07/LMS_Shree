@@ -10,7 +10,7 @@ interface CourseHeroProps {
 
 export default function CourseHero({ course }: CourseHeroProps) {
   return (
-    <section className="bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900 py-20 text-white">
+    <section className="bg-white from-slate-900 via-slate-800 to-blue-900 py-20 text-white">
       <div className="mx-auto grid max-w-7xl items-center gap-12 px-6 lg:grid-cols-2">
         {/* Left Content */}
         <div>

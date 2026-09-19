@@ -21,9 +21,9 @@ export default function GalleryCard({ item }: GalleryCardProps) {
           src={item.image}
           alt={item.title}
           fill
+          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
           className="object-cover transition duration-500 group-hover:scale-110"
         />
-
         {/* Category */}
         <div className="absolute left-5 top-5 rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white">
           {item.category}

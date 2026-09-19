@@ -4,12 +4,22 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Lesson } from "../types/lesson";
-import { Upload, Video, FileText, File, Calendar, Link2 } from "lucide-react";
 
-import { lessonSchema, LessonFormValues } from "../schemas/lessonSchema";
+import { Lesson } from "@/data/lessons";
 
-import { teacherChapters } from "../data/chapters";
+import {
+  Upload,
+  Video,
+  FileText,
+  File,
+  Calendar,
+  Link2,
+} from "lucide-react";
+
+import {
+  lessonSchema,
+  LessonFormValues,
+} from "../schemas/lessonSchema";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,26 +39,49 @@ interface LessonFormProps {
   lesson?: Lesson;
   mode?: "create" | "edit";
 }
+
+interface Chapter {
+  id: string;
+  title: string;
+  description?: string | null;
+  order: number;
+  courseId: string;
+}
+
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL ||
+  "http://localhost:5001/api";
+
 export default function LessonForm({
   courseId,
   lesson,
   mode = "create",
 }: LessonFormProps) {
-  // ----------------------------
+  // --------------------------------
   // Local State
-  // ----------------------------
+  // --------------------------------
 
-  const [contentFile, setContentFile] = useState<File | null>(null);
+  const [contentFile, setContentFile] =
+    useState<File | null>(null);
 
-  const [contentPreview, setContentPreview] = useState("");
+  const [contentPreview, setContentPreview] =
+    useState("");
 
-  const [resourceFiles, setResourceFiles] = useState<File[]>([]);
+  const [resourceFiles, setResourceFiles] =
+    useState<File[]>([]);
 
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSubmitting, setIsSubmitting] =
+    useState(false);
 
-  // ----------------------------
+  const [chapters, setChapters] =
+    useState<Chapter[]>([]);
+
+  const [isLoadingChapters, setIsLoadingChapters] =
+    useState(true);
+
+  // --------------------------------
   // React Hook Form
-  // ----------------------------
+  // --------------------------------
 
   const form = useForm<LessonFormValues>({
     resolver: zodResolver(lessonSchema),
@@ -56,21 +89,81 @@ export default function LessonForm({
     defaultValues: {
       title: lesson?.title ?? "",
       description: lesson?.description ?? "",
-      chapterId: lesson?.chapterId ?? "",
+      chapterId: lesson?.chapter ?? "",
       type: lesson?.type ?? "Video",
       duration: lesson?.duration ?? "",
-      isPreview: lesson?.isPreview ?? false,
+      isPreview: false,
       status: lesson?.status ?? "Draft",
     },
   });
 
   const lessonType = form.watch("type");
 
-  // ----------------------------
-  // Content File
-  // ----------------------------
+  // --------------------------------
+  // Load Chapters From Express API
+  // --------------------------------
 
-  function handleContentFile(e: React.ChangeEvent<HTMLInputElement>) {
+  useEffect(() => {
+    async function loadChapters() {
+      try {
+        setIsLoadingChapters(true);
+
+        const response = await fetch(
+          `${API_URL}/chapters`
+        );
+
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+          throw new Error(
+            data.message || "Failed to load chapters"
+          );
+        }
+
+        const courseChapters = data.data.filter(
+          (chapter: Chapter) =>
+            chapter.courseId === courseId
+        );
+
+        setChapters(courseChapters);
+      } catch (error) {
+        console.error(
+          "Failed to load chapters:",
+          error
+        );
+      } finally {
+        setIsLoadingChapters(false);
+      }
+    }
+
+    loadChapters();
+  }, [courseId]);
+
+  // --------------------------------
+  // Reset when editing
+  // --------------------------------
+
+  useEffect(() => {
+    if (mode === "edit" && lesson) {
+      form.reset({
+        title: lesson.title,
+        description: lesson.description,
+        chapterId: lesson.chapter,
+        type: lesson.type,
+        duration: lesson.duration,
+        isPreview: false,
+        status: lesson.status,
+      });
+    }
+  }, [lesson, mode, form]);
+
+  // --------------------------------
+  // Content File
+  // --------------------------------
+
+  function handleContentFile(
+    e: React.ChangeEvent<HTMLInputElement>
+  ) {
     const file = e.target.files?.[0];
 
     if (!file) return;
@@ -78,23 +171,31 @@ export default function LessonForm({
     setContentFile(file);
 
     if (file.type.startsWith("image/")) {
-      setContentPreview(URL.createObjectURL(file));
+      setContentPreview(
+        URL.createObjectURL(file)
+      );
+    } else {
+      setContentPreview("");
     }
   }
 
-  // ----------------------------
+  // --------------------------------
   // Resource Files
-  // ----------------------------
+  // --------------------------------
 
-  function handleResources(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleResources(
+    e: React.ChangeEvent<HTMLInputElement>
+  ) {
     if (!e.target.files) return;
 
-    setResourceFiles(Array.from(e.target.files));
+    setResourceFiles(
+      Array.from(e.target.files)
+    );
   }
 
-  // ----------------------------
+  // --------------------------------
   // Cleanup
-  // ----------------------------
+  // --------------------------------
 
   useEffect(() => {
     return () => {
@@ -104,47 +205,180 @@ export default function LessonForm({
     };
   }, [contentPreview]);
 
-  // ----------------------------
-  // Submit
-  // ----------------------------
+  // --------------------------------
+  // Convert Frontend Type → Prisma Type
+  // --------------------------------
 
-  async function onSubmit(values: LessonFormValues) {
-  setIsSubmitting(true);
+  function mapLessonType(
+    type: LessonFormValues["type"]
+  ) {
+    const typeMap = {
+      Video: "VIDEO",
+      PDF: "PDF",
+      Document: "DOCUMENT",
+      Assignment: "ASSIGNMENT",
+      "Live Class": "LIVE_CLASS",
+    } as const;
 
-  try {
-    if (mode === "edit") {
-      console.log("Update Lesson", {
-        lessonId: lesson?.id,
-        courseId,
-        ...values,
-        contentFile,
-        resourceFiles,
-      });
-    } else {
-      console.log("Create Lesson", {
-        courseId,
-        ...values,
-        contentFile,
-        resourceFiles,
-      });
-    }
-
-    // TODO: Save to backend
-  } finally {
-    setIsSubmitting(false);
+    return typeMap[type];
   }
-}
+
+  // --------------------------------
+  // Convert Frontend Status → Prisma Status
+  // --------------------------------
+
+  function mapLessonStatus(
+    status: LessonFormValues["status"]
+  ) {
+    const statusMap = {
+      Draft: "DRAFT",
+      Published: "PUBLISHED",
+    } as const;
+
+    return statusMap[status];
+  }
+
+  // --------------------------------
+  // Submit
+  // --------------------------------
+
+  async function onSubmit(
+    values: LessonFormValues
+  ) {
+    setIsSubmitting(true);
+
+    try {
+      if (!values.chapterId) {
+        throw new Error(
+          "Please select a chapter."
+        );
+      }
+
+      const payload = {
+        title: values.title,
+        description: values.description,
+        chapterId: values.chapterId,
+        type: mapLessonType(values.type),
+        duration: values.duration,
+        status: mapLessonStatus(values.status),
+        isPreview: values.isPreview,
+        order: 1,
+      };
+
+      console.log(
+        mode === "edit"
+          ? "Updating lesson:"
+          : "Creating lesson:",
+        payload
+      );
+
+      // --------------------------------
+      // CREATE
+      // --------------------------------
+
+      if (mode === "create") {
+        const response = await fetch(
+          `${API_URL}/lessons`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(payload),
+          }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+          throw new Error(
+            data.message ||
+              "Failed to create lesson"
+          );
+        }
+
+        console.log(
+          "Lesson created:",
+          data.data
+        );
+
+        alert(
+          "Lesson created successfully! 🎉"
+        );
+
+        return;
+      }
+
+      // --------------------------------
+      // UPDATE
+      // --------------------------------
+
+      if (mode === "edit") {
+        if (!lesson?.id) {
+          throw new Error(
+            "Lesson ID is missing."
+          );
+        }
+
+        const response = await fetch(
+          `${API_URL}/lessons/${lesson.id}`,
+          {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(payload),
+          }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+          throw new Error(
+            data.message ||
+              "Failed to update lesson"
+          );
+        }
+
+        console.log(
+          "Lesson updated:",
+          data.data
+        );
+
+        alert(
+          "Lesson updated successfully! 🎉"
+        );
+      }
+    } catch (error) {
+      console.error(
+        "Lesson submission failed:",
+        error
+      );
+
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Something went wrong."
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
 
   return (
     <form
       onSubmit={form.handleSubmit(onSubmit)}
       className="space-y-8 rounded-2xl border bg-card p-8 shadow-sm"
     >
-      {/* Header */}
+      {/* --------------------------------
+          Header
+      -------------------------------- */}
 
       <div className="space-y-1">
         <h2 className="text-2xl font-bold">
-          {mode === "edit" ? "Edit Lesson" : "Create Lesson"}
+          {mode === "edit"
+            ? "Edit Lesson"
+            : "Create Lesson"}
         </h2>
 
         <p className="text-muted-foreground">
@@ -154,11 +388,15 @@ export default function LessonForm({
         </p>
       </div>
 
-      {/* Lesson Information */}
+      {/* --------------------------------
+          Lesson Information
+      -------------------------------- */}
 
       <section className="space-y-6 rounded-xl border p-6">
         <div>
-          <h3 className="text-lg font-semibold">Lesson Information</h3>
+          <h3 className="text-lg font-semibold">
+            Lesson Information
+          </h3>
 
           <p className="text-sm text-muted-foreground">
             Basic information about this lesson.
@@ -166,10 +404,13 @@ export default function LessonForm({
         </div>
 
         <div className="grid gap-6 md:grid-cols-2">
+
           {/* Lesson Title */}
 
           <div className="space-y-2 md:col-span-2">
-            <Label htmlFor="title">Lesson Title</Label>
+            <Label htmlFor="title">
+              Lesson Title
+            </Label>
 
             <Input
               id="title"
@@ -179,7 +420,10 @@ export default function LessonForm({
 
             {form.formState.errors.title && (
               <p className="text-sm text-red-500">
-                {form.formState.errors.title.message}
+                {
+                  form.formState.errors.title
+                    .message
+                }
               </p>
             )}
           </div>
@@ -187,7 +431,9 @@ export default function LessonForm({
           {/* Description */}
 
           <div className="space-y-2 md:col-span-2">
-            <Label htmlFor="description">Description</Label>
+            <Label htmlFor="description">
+              Description
+            </Label>
 
             <Textarea
               id="description"
@@ -198,7 +444,10 @@ export default function LessonForm({
 
             {form.formState.errors.description && (
               <p className="text-sm text-red-500">
-                {form.formState.errors.description.message}
+                {
+                  form.formState.errors
+                    .description.message
+                }
               </p>
             )}
           </div>
@@ -212,19 +461,30 @@ export default function LessonForm({
               control={form.control}
               name="chapterId"
               render={({ field }) => (
-                <Select value={field.value} onValueChange={field.onChange}>
+                <Select
+                  value={field.value}
+                  onValueChange={field.onChange}
+                  disabled={isLoadingChapters}
+                >
                   <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select Chapter" />
+                    <SelectValue
+                      placeholder={
+                        isLoadingChapters
+                          ? "Loading chapters..."
+                          : "Select Chapter"
+                      }
+                    />
                   </SelectTrigger>
 
                   <SelectContent>
-                    {teacherChapters
-                      .filter((chapter) => chapter.courseId === courseId)
-                      .map((chapter) => (
-                        <SelectItem key={chapter.id} value={chapter.id}>
-                          {chapter.title}
-                        </SelectItem>
-                      ))}
+                    {chapters.map((chapter) => (
+                      <SelectItem
+                        key={chapter.id}
+                        value={chapter.id}
+                      >
+                        {chapter.title}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               )}
@@ -232,7 +492,10 @@ export default function LessonForm({
 
             {form.formState.errors.chapterId && (
               <p className="text-sm text-red-500">
-                {form.formState.errors.chapterId.message}
+                {
+                  form.formState.errors
+                    .chapterId.message
+                }
               </p>
             )}
           </div>
@@ -246,21 +509,34 @@ export default function LessonForm({
               control={form.control}
               name="type"
               render={({ field }) => (
-                <Select value={field.value} onValueChange={field.onChange}>
+                <Select
+                  value={field.value}
+                  onValueChange={field.onChange}
+                >
                   <SelectTrigger className="w-full">
                     <SelectValue />
                   </SelectTrigger>
 
                   <SelectContent>
-                    <SelectItem value="Video">🎥 Video</SelectItem>
+                    <SelectItem value="Video">
+                      🎥 Video
+                    </SelectItem>
 
-                    <SelectItem value="PDF">📄 PDF</SelectItem>
+                    <SelectItem value="PDF">
+                      📄 PDF
+                    </SelectItem>
 
-                    <SelectItem value="Document">📑 Document</SelectItem>
+                    <SelectItem value="Document">
+                      📑 Document
+                    </SelectItem>
 
-                    <SelectItem value="Assignment">📝 Assignment</SelectItem>
+                    <SelectItem value="Assignment">
+                      📝 Assignment
+                    </SelectItem>
 
-                    <SelectItem value="Live Class">📹 Live Class</SelectItem>
+                    <SelectItem value="Live Class">
+                      📹 Live Class
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               )}
@@ -268,7 +544,10 @@ export default function LessonForm({
 
             {form.formState.errors.type && (
               <p className="text-sm text-red-500">
-                {form.formState.errors.type.message}
+                {
+                  form.formState.errors.type
+                    .message
+                }
               </p>
             )}
           </div>
@@ -276,7 +555,9 @@ export default function LessonForm({
           {/* Duration */}
 
           <div className="space-y-2">
-            <Label htmlFor="duration">Duration</Label>
+            <Label htmlFor="duration">
+              Duration
+            </Label>
 
             <Input
               id="duration"
@@ -286,7 +567,10 @@ export default function LessonForm({
 
             {form.formState.errors.duration && (
               <p className="text-sm text-red-500">
-                {form.formState.errors.duration.message}
+                {
+                  form.formState.errors
+                    .duration.message
+                }
               </p>
             )}
           </div>
@@ -300,15 +584,22 @@ export default function LessonForm({
               control={form.control}
               name="status"
               render={({ field }) => (
-                <Select value={field.value} onValueChange={field.onChange}>
+                <Select
+                  value={field.value}
+                  onValueChange={field.onChange}
+                >
                   <SelectTrigger className="w-full">
                     <SelectValue />
                   </SelectTrigger>
 
                   <SelectContent>
-                    <SelectItem value="Draft">Draft</SelectItem>
+                    <SelectItem value="Draft">
+                      Draft
+                    </SelectItem>
 
-                    <SelectItem value="Published">Published</SelectItem>
+                    <SelectItem value="Published">
+                      Published
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               )}
@@ -316,26 +607,32 @@ export default function LessonForm({
 
             {form.formState.errors.status && (
               <p className="text-sm text-red-500">
-                {form.formState.errors.status.message}
+                {
+                  form.formState.errors.status
+                    .message
+                }
               </p>
             )}
           </div>
         </div>
       </section>
-      {/* ===========================================
-    Lesson Content
-=========================================== */}
+
+      {/* --------------------------------
+          Lesson Content
+      -------------------------------- */}
 
       <section className="space-y-6 rounded-xl border p-6">
         <div>
-          <h3 className="text-lg font-semibold">Lesson Content</h3>
+          <h3 className="text-lg font-semibold">
+            Lesson Content
+          </h3>
 
           <p className="text-sm text-muted-foreground">
             Upload or configure the lesson content.
           </p>
         </div>
 
-        {/* ---------------- Video ---------------- */}
+        {/* Video */}
 
         {lessonType === "Video" && (
           <div className="space-y-4">
@@ -344,9 +641,13 @@ export default function LessonForm({
             <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 p-10 transition hover:bg-muted/40">
               <Video className="mb-3 h-12 w-12 text-blue-600" />
 
-              <p className="font-medium">Upload Video</p>
+              <p className="font-medium">
+                Upload Video
+              </p>
 
-              <p className="text-sm text-muted-foreground">MP4, MOV, AVI</p>
+              <p className="text-sm text-muted-foreground">
+                MP4, MOV, AVI
+              </p>
 
               <input
                 type="file"
@@ -358,7 +659,7 @@ export default function LessonForm({
           </div>
         )}
 
-        {/* ---------------- PDF ---------------- */}
+        {/* PDF */}
 
         {lessonType === "PDF" && (
           <div className="space-y-4">
@@ -367,7 +668,9 @@ export default function LessonForm({
             <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 p-10 transition hover:bg-muted/40">
               <FileText className="mb-3 h-12 w-12 text-red-600" />
 
-              <p className="font-medium">Upload PDF</p>
+              <p className="font-medium">
+                Upload PDF
+              </p>
 
               <p className="text-sm text-muted-foreground">
                 PDF Documents Only
@@ -383,7 +686,7 @@ export default function LessonForm({
           </div>
         )}
 
-        {/* ---------------- Document ---------------- */}
+        {/* Document */}
 
         {lessonType === "Document" && (
           <div className="space-y-4">
@@ -392,7 +695,9 @@ export default function LessonForm({
             <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 p-10 transition hover:bg-muted/40">
               <File className="mb-3 h-12 w-12 text-indigo-600" />
 
-              <p className="font-medium">Upload Document</p>
+              <p className="font-medium">
+                Upload Document
+              </p>
 
               <p className="text-sm text-muted-foreground">
                 DOC, DOCX, PPT, PPTX
@@ -408,7 +713,7 @@ export default function LessonForm({
           </div>
         )}
 
-        {/* ---------------- Assignment ---------------- */}
+        {/* Assignment */}
 
         {lessonType === "Assignment" && (
           <div className="space-y-6">
@@ -423,17 +728,22 @@ export default function LessonForm({
             </div>
 
             <div className="space-y-2">
-              <Label>Submission Deadline</Label>
+              <Label>
+                Submission Deadline
+              </Label>
 
-              <Input type="datetime-local" />
+              <Input
+                type="datetime-local"
+              />
             </div>
           </div>
         )}
 
-        {/* ---------------- Live Class ---------------- */}
+        {/* Live Class */}
 
         {lessonType === "Live Class" && (
           <div className="grid gap-6 md:grid-cols-2">
+
             <div className="space-y-2">
               <Label>Meeting Link</Label>
 
@@ -453,17 +763,22 @@ export default function LessonForm({
               <div className="relative">
                 <Calendar className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
 
-                <Input className="pl-10" type="datetime-local" />
+                <Input
+                  className="pl-10"
+                  type="datetime-local"
+                />
               </div>
             </div>
+
           </div>
         )}
 
-        {/* ---------------- Selected File ---------------- */}
+        {/* Selected File */}
 
         {contentFile && (
           <div className="rounded-xl border bg-muted/30 p-5">
             <div className="flex items-center gap-4">
+
               {contentFile.type.startsWith("video") ? (
                 <Video className="h-10 w-10 text-blue-600" />
               ) : contentFile.type.includes("pdf") ? (
@@ -473,7 +788,9 @@ export default function LessonForm({
               )}
 
               <div className="flex-1">
-                <p className="font-semibold">{contentFile.name}</p>
+                <p className="font-semibold">
+                  {contentFile.name}
+                </p>
 
                 <p className="text-sm text-muted-foreground">
                   {(contentFile.size / 1024 / 1024).toFixed(2)} MB
@@ -495,13 +812,16 @@ export default function LessonForm({
           </div>
         )}
       </section>
-      {/* ===========================================
-    Learning Resources
-=========================================== */}
+
+      {/* --------------------------------
+          Learning Resources
+      -------------------------------- */}
 
       <section className="space-y-6 rounded-xl border p-6">
         <div>
-          <h3 className="text-lg font-semibold">Learning Resources</h3>
+          <h3 className="text-lg font-semibold">
+            Learning Resources
+          </h3>
 
           <p className="text-sm text-muted-foreground">
             Upload additional files that students can download.
@@ -511,7 +831,9 @@ export default function LessonForm({
         <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 p-8 transition hover:bg-muted/40">
           <Upload className="mb-3 h-10 w-10 text-primary" />
 
-          <p className="font-medium">Upload Resources</p>
+          <p className="font-medium">
+            Upload Resources
+          </p>
 
           <p className="text-sm text-muted-foreground">
             PDF, DOCX, PPTX, ZIP (Multiple files supported)
@@ -528,7 +850,9 @@ export default function LessonForm({
 
         {resourceFiles.length > 0 && (
           <div className="space-y-3 rounded-xl border bg-muted/30 p-4">
-            <h4 className="font-medium">Uploaded Resources</h4>
+            <h4 className="font-medium">
+              Uploaded Resources
+            </h4>
 
             {resourceFiles.map((file, index) => (
               <div
@@ -538,7 +862,9 @@ export default function LessonForm({
                 <File className="h-5 w-5 text-primary" />
 
                 <div className="flex-1">
-                  <p className="text-sm font-medium">{file.name}</p>
+                  <p className="text-sm font-medium">
+                    {file.name}
+                  </p>
 
                   <p className="text-xs text-muted-foreground">
                     {(file.size / 1024 / 1024).toFixed(2)} MB
@@ -550,13 +876,15 @@ export default function LessonForm({
         )}
       </section>
 
-      {/* ===========================================
-    Learning Settings
-=========================================== */}
+      {/* --------------------------------
+          Learning Settings
+      -------------------------------- */}
 
       <section className="space-y-6 rounded-xl border p-6">
         <div>
-          <h3 className="text-lg font-semibold">Learning Settings</h3>
+          <h3 className="text-lg font-semibold">
+            Learning Settings
+          </h3>
 
           <p className="text-sm text-muted-foreground">
             Configure how students will access this lesson.
@@ -571,7 +899,9 @@ export default function LessonForm({
           render={({ field }) => (
             <div className="flex items-center justify-between rounded-xl border p-4">
               <div>
-                <h4 className="font-medium">Free Preview</h4>
+                <h4 className="font-medium">
+                  Free Preview
+                </h4>
 
                 <p className="text-sm text-muted-foreground">
                   Students can view this lesson before enrolling.
@@ -581,7 +911,9 @@ export default function LessonForm({
               <input
                 type="checkbox"
                 checked={field.value}
-                onChange={(e) => field.onChange(e.target.checked)}
+                onChange={(e) =>
+                  field.onChange(e.target.checked)
+                }
                 className="h-5 w-5"
               />
             </div>
@@ -629,12 +961,14 @@ export default function LessonForm({
           />
         </div>
       </section>
-      {/* ===========================================
-    Actions
-=========================================== */}
+
+      {/* --------------------------------
+          Actions
+      -------------------------------- */}
 
       <section className="rounded-xl border p-6">
         <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+
           <Button
             type="button"
             variant="outline"
@@ -649,13 +983,19 @@ export default function LessonForm({
             variant="secondary"
             disabled={isSubmitting}
             onClick={() => {
-              console.log("Save Draft", form.getValues());
+              console.log(
+                "Save Draft",
+                form.getValues()
+              );
             }}
           >
             Save Draft
           </Button>
 
-          <Button type="submit" disabled={isSubmitting}>
+          <Button
+            type="submit"
+            disabled={isSubmitting}
+          >
             {isSubmitting
               ? mode === "edit"
                 ? "Updating..."
@@ -664,6 +1004,7 @@ export default function LessonForm({
                 ? "Update Lesson"
                 : "Publish Lesson"}
           </Button>
+
         </div>
       </section>
     </form>

@@ -2,46 +2,85 @@ import { notFound } from "next/navigation";
 
 import LessonList from "@/features/teacher/lessons/components/LessonList";
 
-import { teacherCourses } from "@/features/teacher/courses/data/courses";
-import { teacherLessons } from "@/features/teacher/lessons/data/lessons";
-import { teacherChapters } from "@/features/teacher/lessons/data/chapters";
-
 interface PageProps {
   params: Promise<{
     courseId: string;
   }>;
 }
 
-export default async function LessonsPage({ params }: PageProps) {
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL ||
+  "http://localhost:5001/api";
+
+export default async function LessonsPage({
+  params,
+}: PageProps) {
   const { courseId } = await params;
 
-  const course = teacherCourses.find((course) => course.id === courseId);
+  try {
+    // Get the real course from Express
+    const courseResponse = await fetch(
+      `${API_URL}/courses/${courseId}`,
+      {
+        cache: "no-store",
+      }
+    );
 
-  if (!course) {
+    if (!courseResponse.ok) {
+      notFound();
+    }
+
+    const courseResult = await courseResponse.json();
+
+    if (!courseResult.success || !courseResult.data) {
+      notFound();
+    }
+
+    const course = courseResult.data;
+
+    // Chapters and lessons are already included
+    // by your backend course endpoint.
+    const chapters = [...(course.chapters ?? [])].sort(
+      (a, b) => a.order - b.order
+    );
+
+    const lessons = chapters
+      .flatMap((chapter) =>
+        (chapter.lessons ?? []).map((lesson) => ({
+          ...lesson,
+          courseId: course.id,
+          chapterId: chapter.id,
+        }))
+      )
+      .sort((a, b) => a.order - b.order);
+
+    return (
+      <div className="space-y-6">
+        {/* Page Header */}
+        <div className="rounded-xl border bg-card p-6">
+          <h1 className="text-3xl font-bold">
+            {course.title}
+          </h1>
+
+          <p className="mt-2 text-muted-foreground">
+            Manage your course curriculum by organizing
+            chapters and lessons.
+          </p>
+        </div>
+
+        <LessonList
+          courseId={courseId}
+          chapters={chapters}
+          lessons={lessons}
+        />
+      </div>
+    );
+  } catch (error) {
+    console.error(
+      "Failed to load course:",
+      error
+    );
+
     notFound();
   }
-
-  const chapters = teacherChapters
-    .filter((chapter) => chapter.courseId === courseId)
-    .sort((a, b) => a.order - b.order);
-
-  const lessons = teacherLessons
-    .filter((lesson) => lesson.courseId === courseId)
-    .sort((a, b) => a.order - b.order);
-
-  return (
-    <div className="space-y-6">
-      {/* Page Header */}
-
-      <div className="rounded-xl border bg-card p-6">
-        <h1 className="text-3xl font-bold">{course.title}</h1>
-
-        <p className="mt-2 text-muted-foreground">
-          Manage your course curriculum by organizing chapters and lessons.
-        </p>
-      </div>
-
-      <LessonList courseId={courseId} chapters={chapters} lessons={lessons} />
-    </div>
-  );
 }

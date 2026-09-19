@@ -8,7 +8,6 @@ export default function CoursesPage() {
   return (
     <>
       <CoursesHero />
-
       <FeaturedCourses />
 
       <CourseFilters />
